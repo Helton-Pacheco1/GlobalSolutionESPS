@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dragon-01 - Telemetria</title>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet" />
+
+  <!-- Chart.js para os gráficos -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
+  <!-- MQTT.js para conectar ao HiveMQ -->
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+  <style>
+    /* Reset básico */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Roboto', sans-serif;
+      background-color: #0d1117;
+      color: #e6edf3;
+    }
+
+    /* Cabeçalho */
+    header {
+      background-color: #161b22;
+      border-bottom: 2px solid #30363d;
+      padding: 20px;
+      text-align: center;
+    }
+
+    header h1 {
+      font-size: 24px;
+      color: #58a6ff;
+    }
+
+    header p {
+      font-size: 14px;
+      color: #8b949e;
+      margin-top: 4px;
+    }
+
+    /* Status da conexão */
+    #status {
+      text-align: center;
+      padding: 10px;
+      font-size: 14px;
+      background-color: #21262d;
+      color: #8b949e;
+    }
+
+    #status.conectado {
+      color: #3fb950;
+    }
+
+    #status.erro {
+      color: #f85149;
+    }
+
+    /* Container principal */
+    main {
+      max-width: 1000px;
+      margin: 20px auto;
+      padding: 0 16px;
+    }
+
+    /* Título de seção */
+    h2 {
+      font-size: 16px;
+      color: #8b949e;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* Cards dos sensores */
+    .cards {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 30px;
+    }
+
+    .card {
+      flex: 1;
+      background-color: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .card h3 {
+      font-size: 14px;
+      color: #8b949e;
+      margin-bottom: 10px;
+    }
+
+    .card .valor {
+      font-size: 42px;
+      font-weight: 700;
+      color: #3fb950;
+    }
+
+    .card .unidade {
+      font-size: 14px;
+      color: #8b949e;
+      margin-top: 4px;
+    }
+
+    .card .faixa {
+      font-size: 12px;
+      color: #8b949e;
+      margin-top: 8px;
+    }
+
+    /* Cor de alerta nos cards */
+    .card.alerta .valor {
+      color: #f85149;
+    }
+
+    .card.alerta {
+      border-color: #f85149;
+    }
+
+    /* Alerta geral */
+    #alerta-geral {
+      display: none;
+      background-color: #3d1f1f;
+      border: 1px solid #f85149;
+      border-radius: 8px;
+      padding: 14px 20px;
+      margin-bottom: 20px;
+      color: #f85149;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    /* Gráficos */
+    .graficos {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 30px;
+    }
+
+    .grafico-box {
+      flex: 1;
+      background-color: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .grafico-box h3 {
+      font-size: 13px;
+      color: #8b949e;
+      margin-bottom: 10px;
+    }
+
+    /* Log de mensagens */
+    #log {
+      background-color: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 12px 16px;
+      height: 120px;
+      overflow-y: auto;
+      font-size: 12px;
+      color: #8b949e;
+      margin-bottom: 30px;
+    }
+
+    /* Rodapé */
+    footer {
+      text-align: center;
+      padding: 20px;
+      font-size: 12px;
+      color: #484f58;
+      border-top: 1px solid #21262d;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>🚀 SpaceX Dragon - Telemetria em Tempo Real</h1>
+    <p>Global Solution 2026 | FIAP - Edge Computing & Computer Systems</p>
+  </header>
+
+  <div id="status">Aguardando conexão com o broker...</div>
+
+  <main>
+
+    <!-- Alerta geral -->
+    <div id="alerta-geral">
+      ⚠ ANOMALIA DETECTADA - Verifique os parâmetros da cápsula!
+    </div>
+
+    <!-- Cards dos sensores -->
+    <h2>Parâmetros em Tempo Real</h2>
+    <div class="cards">
+      <div class="card" id="card-temp">
+        <h3>🌡 Temperatura</h3>
+        <div class="valor" id="val-temp">--</div>
+        <div class="unidade">°C</div>
+        <div class="faixa">Faixa nominal: 18°C a 28°C</div>
+      </div>
+
+      <div class="card" id="card-press">
+        <h3>🔵 Pressão</h3>
+        <div class="valor" id="val-press">--</div>
+        <div class="unidade">kPa</div>
+        <div class="faixa">Faixa nominal: 90 a 110 kPa</div>
+      </div>
+
+      <div class="card" id="card-o2">
+        <h3>💨 Oxigênio</h3>
+        <div class="valor" id="val-o2">--</div>
+        <div class="unidade">%</div>
+        <div class="faixa">Faixa nominal: 19% a 23%</div>
+      </div>
+    </div>
+
+    <!-- Gráficos históricos -->
+    <h2>Histórico</h2>
+    <div class="graficos">
+      <div class="grafico-box">
+        <h3>Temperatura (°C)</h3>
+        <canvas id="grafico-temp" height="120"></canvas>
+      </div>
+      <div class="grafico-box">
+        <h3>Pressão (kPa)</h3>
+        <canvas id="grafico-press" height="120"></canvas>
+      </div>
+      <div class="grafico-box">
+        <h3>Oxigênio (%)</h3>
+        <canvas id="grafico-o2" height="120"></canvas>
+      </div>
+    </div>
+
+    <!-- Log -->
+    <h2>Log de Mensagens</h2>
+    <div id="log"></div>
+
+  </main>
+
+  <footer>
+    FIAP &mdash; Edge Computing &amp; Computer Systems &mdash; Global Solution 2026
+  </footer>
+
+<script>
+  // ==========================================
+  // CONFIGURAÇÕES DO BROKER MQTT
+  // ==========================================
+  var broker = "wss://9ca03c36523a4fbaa8ffdfb128beef7b.s1.eu.hivemq.cloud:8884/mqtt";
+  var usuario = "GlobalSolutionESPS";
+  var senha = "Global@Solution1";
+  var topico = "spacex/dragon01/telemetry";
+
+  // ==========================================
+  // GRÁFICOS COM CHART.JS
+  // ==========================================
+  var labels = [];
+
+  var graficoTemp = new Chart(document.getElementById("grafico-temp"), {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [{
+        label: "Temperatura",
+        data: [],
+        borderColor: "#58a6ff",
+        backgroundColor: "rgba(88, 166, 255, 0.1)",
+        borderWidth: 2,
+        tension: 0.3,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: "#8b949e", font: { size: 9 } }, grid: { color: "#21262d" } },
+        y: { ticks: { color: "#8b949e" }, grid: { color: "#21262d" }, min: 10, max: 40 }
+      }
+    }
+  });
+
+  var graficoPress = new Chart(document.getElementById("grafico-press"), {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [{
+        label: "Pressão",
+        data: [],
+        borderColor: "#3fb950",
+        backgroundColor: "rgba(63, 185, 80, 0.1)",
+        borderWidth: 2,
+        tension: 0.3,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: "#8b949e", font: { size: 9 } }, grid: { color: "#21262d" } },
+        y: { ticks: { color: "#8b949e" }, grid: { color: "#21262d" }, min: 70, max: 130 }
+      }
+    }
+  });
+
+  var graficoO2 = new Chart(document.getElementById("grafico-o2"), {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [{
+        label: "Oxigênio",
+        data: [],
+        borderColor: "#d2a8ff",
+        backgroundColor: "rgba(210, 168, 255, 0.1)",
+        borderWidth: 2,
+        tension: 0.3,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: "#8b949e", font: { size: 9 } }, grid: { color: "#21262d" } },
+        y: { ticks: { color: "#8b949e" }, grid: { color: "#21262d" }, min: 10, max: 30 }
+      }
+    }
+  });
+
+  // Adiciona dado nos gráficos e mantém só os últimos 20 pontos
+  function adicionarNosGraficos(hora, temp, press, o2) {
+    var MAX = 20;
+
+    labels.push(hora);
+    graficoTemp.data.datasets[0].data.push(temp);
+    graficoPress.data.datasets[0].data.push(press);
+    graficoO2.data.datasets[0].data.push(o2);
+
+    if (labels.length > MAX) {
+      labels.shift();
+      graficoTemp.data.datasets[0].data.shift();
+      graficoPress.data.datasets[0].data.shift();
+      graficoO2.data.datasets[0].data.shift();
+    }
+
+    graficoTemp.update();
+    graficoPress.update();
+    graficoO2.update();
+  }
+
+  // ==========================================
+  // LOG
+  // ==========================================
+  function adicionarLog(mensagem) {
+    var log = document.getElementById("log");
+    var hora = new Date().toLocaleTimeString("pt-BR");
+    log.innerHTML += "<div>[" + hora + "] " + mensagem + "</div>";
+    log.scrollTop = log.scrollHeight;
+  }
+
+  // ==========================================
+  // ATUALIZA CARDS
+  // ==========================================
+  function atualizarCard(idCard, idValor, valor, min, max) {
+    var card = document.getElementById(idCard);
+    var el = document.getElementById(idValor);
+
+    el.textContent = valor;
+
+    if (valor < min || valor > max) {
+      card.classList.add("alerta");
+      return true; // tem alerta
+    } else {
+      card.classList.remove("alerta");
+      return false;
+    }
+  }
+
+  // ==========================================
+  // PROCESSA A MENSAGEM RECEBIDA DO ESP32
+  // ==========================================
+  function processarMensagem(payload) {
+    var dados;
+
+    try {
+      dados = JSON.parse(payload);
+    } catch (e) {
+      adicionarLog("Erro ao ler mensagem: " + payload);
+      return;
+    }
+
+    var temp  = dados.temperatura;
+    var press = dados.pressao;
+    var o2    = dados.oxigenio;
+    var hora  = new Date().toLocaleTimeString("pt-BR");
+
+    // Atualiza os cards e verifica alertas
+    var alertaTemp  = atualizarCard("card-temp",  "val-temp",  temp,  18, 28);
+    var alertaPress = atualizarCard("card-press", "val-press", press, 90, 110);
+    var alertaO2    = atualizarCard("card-o2",    "val-o2",    o2,    19, 23);
+
+    // Mostra ou esconde o alerta geral
+    if (alertaTemp || alertaPress || alertaO2) {
+      document.getElementById("alerta-geral").style.display = "block";
+      adicionarLog("⚠ ALERTA! T=" + temp + "°C | P=" + press + "kPa | O2=" + o2 + "%");
+    } else {
+      document.getElementById("alerta-geral").style.display = "none";
+      adicionarLog("OK — T=" + temp + "°C | P=" + press + "kPa | O2=" + o2 + "%");
+    }
+
+    // Adiciona nos gráficos
+    adicionarNosGraficos(hora, temp, press, o2);
+  }
+
+  // ==========================================
+  // CONEXÃO MQTT
+  // ==========================================
+  var statusEl = document.getElementById("status");
+
+  statusEl.textContent = "Conectando ao broker HiveMQ...";
+
+  var cliente = mqtt.connect(broker, {
+    username: usuario,
+    password: senha,
+    clientId: "dashboard-dragon-" + Math.random().toString(16).slice(2, 6)
+  });
+
+  cliente.on("connect", function() {
+    statusEl.textContent = "✔ Conectado ao HiveMQ — aguardando dados do ESP32...";
+    statusEl.className = "conectado";
+    adicionarLog("Conexão estabelecida com o broker MQTT.");
+
+    cliente.subscribe(topico, function(erro) {
+      if (erro) {
+        adicionarLog("Erro ao inscrever no tópico: " + erro.message);
+      } else {
+        adicionarLog("Inscrito no tópico: " + topico);
+      }
+    });
+  });
+
+  cliente.on("message", function(topico, mensagem) {
+    processarMensagem(mensagem.toString());
+  });
+
+  cliente.on("error", function(erro) {
+    statusEl.textContent = "✖ Erro na conexão: " + erro.message;
+    statusEl.className = "erro";
+    adicionarLog("Erro: " + erro.message);
+  });
+
+  cliente.on("offline", function() {
+    statusEl.textContent = "Broker offline — tentando reconectar...";
+    statusEl.className = "";
+  });
+</script>
+
+</body>
+</html>
