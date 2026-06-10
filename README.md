@@ -163,8 +163,9 @@ O painel com os gauges fica disponível em `http://localhost:1880/ui`
 
 1. Execute `node-red` no terminal
 2. Importe o fluxo `backend/dragon_nodered_flow.json`
-3. Clique em **Deploy**
-4. Acesse `http://localhost:1880/ui` para ver os gauges em tempo real
+3. Coloque o QoS em 0 
+4. Clique em **Deploy**
+5. Acesse `http://localhost:1880/ui` para ver os gauges em tempo real
 
 ### 3. Monitorar no HiveMQ
 
