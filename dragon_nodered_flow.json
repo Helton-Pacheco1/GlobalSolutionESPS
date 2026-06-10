@@ -1,0 +1,261 @@
+[
+  {
+    "id": "tab-dragon",
+    "type": "tab",
+    "label": "Dragon-01 Telemetria",
+    "disabled": false,
+    "info": "Back-end de telemetria da cápsula SpaceX Dragon - FIAP Global Solution 2026"
+  },
+
+  {
+    "id": "mqtt-in-telemetry",
+    "type": "mqtt in",
+    "z": "tab-dragon",
+    "name": "Recebe Telemetria",
+    "topic": "spacex/dragon01/telemetry",
+    "qos": "1",
+    "datatype": "json",
+    "broker": "hivemq-broker",
+    "x": 140,
+    "y": 100,
+    "wires": [["parse-payload"]]
+  },
+
+  {
+    "id": "parse-payload",
+    "type": "function",
+    "z": "tab-dragon",
+    "name": "Processa Dados",
+    "func": "// Extrai os dados do payload recebido do ESP32\nvar temperatura = msg.payload.temperatura;\nvar pressao     = msg.payload.pressao;\nvar oxigenio    = msg.payload.oxigenio;\nvar alerta      = msg.payload.alerta;\n\n// Define faixas nominais\nvar tempOk  = temperatura >= 18 && temperatura <= 28;\nvar pressOk = pressao     >= 90 && pressao     <= 110;\nvar o2Ok    = oxigenio    >= 19 && oxigenio    <= 23;\n\n// Monta status de cada parâmetro\nvar statusTemp  = tempOk  ? \"NOMINAL\" : \"ALERTA\";\nvar statusPress = pressOk ? \"NOMINAL\" : \"ALERTA\";\nvar statusO2    = o2Ok    ? \"NOMINAL\" : \"ALERTA\";\n\n// Monta payload enriquecido\nmsg.payload = {\n    temperatura : temperatura,\n    pressao     : pressao,\n    oxigenio    : oxigenio,\n    alerta      : alerta,\n    statusTemp  : statusTemp,\n    statusPress : statusPress,\n    statusO2    : statusO2,\n    timestamp   : new Date().toLocaleString(\"pt-BR\")\n};\n\n// Define cor do status geral no debug\nif (alerta) {\n    node.warn(\"ANOMALIA DETECTADA: \" + JSON.stringify(msg.payload));\n} else {\n    node.log(\"Telemetria OK: T=\" + temperatura + \"°C | P=\" + pressao + \"kPa | O2=\" + oxigenio + \"%\");\n}\n\nreturn msg;",
+    "outputs": 1,
+    "x": 340,
+    "y": 100,
+    "wires": [["debug-dados", "verifica-alerta", "dashboard-temp", "dashboard-press", "dashboard-o2"]]
+  },
+
+  {
+    "id": "debug-dados",
+    "type": "debug",
+    "z": "tab-dragon",
+    "name": "Debug Telemetria",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "payload.timestamp",
+    "statusType": "auto",
+    "x": 560,
+    "y": 40,
+    "wires": []
+  },
+
+  {
+    "id": "verifica-alerta",
+    "type": "switch",
+    "z": "tab-dragon",
+    "name": "Tem Alerta?",
+    "property": "payload.alerta",
+    "propertyType": "msg",
+    "rules": [
+      { "t": "true" },
+      { "t": "false" }
+    ],
+    "checkall": "true",
+    "repair": false,
+    "outputs": 2,
+    "x": 560,
+    "y": 140,
+    "wires": [["notifica-alerta"], ["status-nominal"]]
+  },
+
+  {
+    "id": "notifica-alerta",
+    "type": "function",
+    "z": "tab-dragon",
+    "name": "Formata Alerta",
+    "func": "var p = msg.payload;\nvar problemas = [];\n\nif (p.statusTemp  === \"ALERTA\") problemas.push(\"Temperatura: \" + p.temperatura + \"°C\");\nif (p.statusPress === \"ALERTA\") problemas.push(\"Pressão: \"    + p.pressao     + \" kPa\");\nif (p.statusO2    === \"ALERTA\") problemas.push(\"Oxigênio: \"   + p.oxigenio    + \"%\");\n\nmsg.payload = \"⚠ ANOMALIA DETECTADA em \" + p.timestamp + \"\\n\" + problemas.join(\"\\n\");\nmsg.topic   = \"ALERTA\";\n\nreturn msg;",
+    "outputs": 1,
+    "x": 780,
+    "y": 100,
+    "wires": [["debug-alerta"]]
+  },
+
+  {
+    "id": "status-nominal",
+    "type": "function",
+    "z": "tab-dragon",
+    "name": "Formata Nominal",
+    "func": "var p = msg.payload;\nmsg.payload = \"✔ NOMINAL em \" + p.timestamp + \" | T=\" + p.temperatura + \"°C | P=\" + p.pressao + \"kPa | O2=\" + p.oxigenio + \"%\";\nmsg.topic   = \"NOMINAL\";\nreturn msg;",
+    "outputs": 1,
+    "x": 780,
+    "y": 180,
+    "wires": [["debug-alerta"]]
+  },
+
+  {
+    "id": "debug-alerta",
+    "type": "debug",
+    "z": "tab-dragon",
+    "name": "Debug Status",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "x": 980,
+    "y": 140,
+    "wires": []
+  },
+
+  {
+    "id": "dashboard-temp",
+    "type": "ui_gauge",
+    "z": "tab-dragon",
+    "name": "Gauge Temperatura",
+    "group": "grupo-telemetria",
+    "order": 1,
+    "width": 6,
+    "height": 4,
+    "gtype": "gage",
+    "title": "Temperatura",
+    "label": "°C",
+    "format": "{{value}}",
+    "min": 0,
+    "max": 50,
+    "colors": ["#00b4d8", "#3fb950", "#f85149"],
+    "seg1": 18,
+    "seg2": 28,
+    "x": 560,
+    "y": 240,
+    "wires": []
+  },
+
+  {
+    "id": "dashboard-press",
+    "type": "ui_gauge",
+    "z": "tab-dragon",
+    "name": "Gauge Pressão",
+    "group": "grupo-telemetria",
+    "order": 2,
+    "width": 6,
+    "height": 4,
+    "gtype": "gage",
+    "title": "Pressão",
+    "label": "kPa",
+    "format": "{{value}}",
+    "min": 70,
+    "max": 130,
+    "colors": ["#00b4d8", "#3fb950", "#f85149"],
+    "seg1": 90,
+    "seg2": 110,
+    "x": 560,
+    "y": 300,
+    "wires": []
+  },
+
+  {
+    "id": "dashboard-o2",
+    "type": "ui_gauge",
+    "z": "tab-dragon",
+    "name": "Gauge Oxigênio",
+    "group": "grupo-telemetria",
+    "order": 3,
+    "width": 6,
+    "height": 4,
+    "gtype": "gage",
+    "title": "Oxigênio",
+    "label": "%",
+    "format": "{{value}}",
+    "min": 10,
+    "max": 30,
+    "colors": ["#f85149", "#3fb950", "#f85149"],
+    "seg1": 19,
+    "seg2": 23,
+    "x": 560,
+    "y": 360,
+    "wires": []
+  },
+
+  {
+    "id": "mqtt-in-alerts",
+    "type": "mqtt in",
+    "z": "tab-dragon",
+    "name": "Recebe Alertas",
+    "topic": "spacex/dragon01/alerts",
+    "qos": "1",
+    "datatype": "json",
+    "broker": "hivemq-broker",
+    "x": 140,
+    "y": 440,
+    "wires": [["debug-alerta-raw"]]
+  },
+
+  {
+    "id": "debug-alerta-raw",
+    "type": "debug",
+    "z": "tab-dragon",
+    "name": "Debug Alerta Raw",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 360,
+    "y": 440,
+    "wires": []
+  },
+
+  {
+    "id": "hivemq-broker",
+    "type": "mqtt-broker",
+    "name": "HiveMQ Cloud Dragon",
+    "broker": "9ca03c36523a4fbaa8ffdfb128beef7b.s1.eu.hivemq.cloud",
+    "port": "8883",
+    "tls": true,
+    "clientid": "nodered-dragon-backend",
+    "autoConnect": true,
+    "usetls": true,
+    "protocolVersion": "4",
+    "keepalive": "60",
+    "cleansession": true,
+    "birthTopic": "",
+    "birthQos": "0",
+    "birthPayload": "",
+    "closeTopic": "",
+    "closeQos": "0",
+    "closePayload": "",
+    "willTopic": "",
+    "willQos": "0",
+    "willPayload": "",
+    "credentials": {
+      "user": "GlobalSolutionESPS",
+      "password": "Global@Solution1"
+    }
+  },
+
+  {
+    "id": "grupo-telemetria",
+    "type": "ui_group",
+    "name": "Dragon-01 Telemetria",
+    "tab": "ui-tab-dragon",
+    "order": 1,
+    "disp": true,
+    "width": "18",
+    "collapse": false
+  },
+
+  {
+    "id": "ui-tab-dragon",
+    "type": "ui_tab",
+    "name": "Dragon-01",
+    "icon": "dashboard",
+    "order": 1,
+    "disp": true
+  }
+]
