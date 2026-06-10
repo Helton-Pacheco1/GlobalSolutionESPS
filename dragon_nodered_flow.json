@@ -26,11 +26,11 @@
     "type": "function",
     "z": "tab-dragon",
     "name": "Processa Dados",
-    "func": "// Extrai os dados do payload recebido do ESP32\nvar temperatura = msg.payload.temperatura;\nvar pressao     = msg.payload.pressao;\nvar oxigenio    = msg.payload.oxigenio;\nvar alerta      = msg.payload.alerta;\n\n// Define faixas nominais\nvar tempOk  = temperatura >= 18 && temperatura <= 28;\nvar pressOk = pressao     >= 90 && pressao     <= 110;\nvar o2Ok    = oxigenio    >= 19 && oxigenio    <= 23;\n\n// Monta status de cada parâmetro\nvar statusTemp  = tempOk  ? \"NOMINAL\" : \"ALERTA\";\nvar statusPress = pressOk ? \"NOMINAL\" : \"ALERTA\";\nvar statusO2    = o2Ok    ? \"NOMINAL\" : \"ALERTA\";\n\n// Monta payload enriquecido\nmsg.payload = {\n    temperatura : temperatura,\n    pressao     : pressao,\n    oxigenio    : oxigenio,\n    alerta      : alerta,\n    statusTemp  : statusTemp,\n    statusPress : statusPress,\n    statusO2    : statusO2,\n    timestamp   : new Date().toLocaleString(\"pt-BR\")\n};\n\n// Define cor do status geral no debug\nif (alerta) {\n    node.warn(\"ANOMALIA DETECTADA: \" + JSON.stringify(msg.payload));\n} else {\n    node.log(\"Telemetria OK: T=\" + temperatura + \"°C | P=\" + pressao + \"kPa | O2=\" + oxigenio + \"%\");\n}\n\nreturn msg;",
+    "func": "var temperatura = msg.payload.temperatura;\nvar pressao     = msg.payload.pressao;\nvar oxigenio    = msg.payload.oxigenio;\nvar alerta      = msg.payload.alerta;\n\nvar tempOk  = temperatura >= 18 && temperatura <= 28;\nvar pressOk = pressao     >= 90 && pressao     <= 110;\nvar o2Ok    = oxigenio    >= 19 && oxigenio    <= 23;\n\nvar statusTemp  = tempOk  ? 'NOMINAL' : 'ALERTA';\nvar statusPress = pressOk ? 'NOMINAL' : 'ALERTA';\nvar statusO2    = o2Ok    ? 'NOMINAL' : 'ALERTA';\n\nmsg.payload = {\n    temperatura : temperatura,\n    pressao     : pressao,\n    oxigenio    : oxigenio,\n    alerta      : alerta,\n    statusTemp  : statusTemp,\n    statusPress : statusPress,\n    statusO2    : statusO2,\n    timestamp   : new Date().toLocaleString('pt-BR')\n};\n\nif (alerta) {\n    node.warn('ANOMALIA: ' + JSON.stringify(msg.payload));\n} else {\n    node.log('OK: T=' + temperatura + ' P=' + pressao + ' O2=' + oxigenio);\n}\n\nreturn msg;",
     "outputs": 1,
     "x": 340,
     "y": 100,
-    "wires": [["debug-dados", "verifica-alerta", "dashboard-temp", "dashboard-press", "dashboard-o2"]]
+    "wires": [["debug-dados", "verifica-alerta", "extrai-temp", "extrai-press", "extrai-o2"]]
   },
 
   {
@@ -75,7 +75,7 @@
     "type": "function",
     "z": "tab-dragon",
     "name": "Formata Alerta",
-    "func": "var p = msg.payload;\nvar problemas = [];\n\nif (p.statusTemp  === \"ALERTA\") problemas.push(\"Temperatura: \" + p.temperatura + \"°C\");\nif (p.statusPress === \"ALERTA\") problemas.push(\"Pressão: \"    + p.pressao     + \" kPa\");\nif (p.statusO2    === \"ALERTA\") problemas.push(\"Oxigênio: \"   + p.oxigenio    + \"%\");\n\nmsg.payload = \"⚠ ANOMALIA DETECTADA em \" + p.timestamp + \"\\n\" + problemas.join(\"\\n\");\nmsg.topic   = \"ALERTA\";\n\nreturn msg;",
+    "func": "var p = msg.payload;\nvar problemas = [];\nif (p.statusTemp  === 'ALERTA') problemas.push('Temperatura: ' + p.temperatura + 'C');\nif (p.statusPress === 'ALERTA') problemas.push('Pressao: '    + p.pressao     + ' kPa');\nif (p.statusO2    === 'ALERTA') problemas.push('Oxigenio: '   + p.oxigenio    + '%');\nmsg.payload = 'ANOMALIA em ' + p.timestamp + ' | ' + problemas.join(' | ');\nmsg.topic   = 'ALERTA';\nreturn msg;",
     "outputs": 1,
     "x": 780,
     "y": 100,
@@ -87,7 +87,7 @@
     "type": "function",
     "z": "tab-dragon",
     "name": "Formata Nominal",
-    "func": "var p = msg.payload;\nmsg.payload = \"✔ NOMINAL em \" + p.timestamp + \" | T=\" + p.temperatura + \"°C | P=\" + p.pressao + \"kPa | O2=\" + p.oxigenio + \"%\";\nmsg.topic   = \"NOMINAL\";\nreturn msg;",
+    "func": "var p = msg.payload;\nmsg.payload = 'NOMINAL em ' + p.timestamp + ' | T=' + p.temperatura + 'C | P=' + p.pressao + 'kPa | O2=' + p.oxigenio + '%';\nmsg.topic   = 'NOMINAL';\nreturn msg;",
     "outputs": 1,
     "x": 780,
     "y": 180,
@@ -111,6 +111,42 @@
   },
 
   {
+    "id": "extrai-temp",
+    "type": "function",
+    "z": "tab-dragon",
+    "name": "Extrai Temperatura",
+    "func": "msg.payload = msg.payload.temperatura;\nreturn msg;",
+    "outputs": 1,
+    "x": 560,
+    "y": 260,
+    "wires": [["dashboard-temp"]]
+  },
+
+  {
+    "id": "extrai-press",
+    "type": "function",
+    "z": "tab-dragon",
+    "name": "Extrai Pressao",
+    "func": "msg.payload = msg.payload.pressao;\nreturn msg;",
+    "outputs": 1,
+    "x": 560,
+    "y": 320,
+    "wires": [["dashboard-press"]]
+  },
+
+  {
+    "id": "extrai-o2",
+    "type": "function",
+    "z": "tab-dragon",
+    "name": "Extrai Oxigenio",
+    "func": "msg.payload = msg.payload.oxigenio;\nreturn msg;",
+    "outputs": 1,
+    "x": 560,
+    "y": 380,
+    "wires": [["dashboard-o2"]]
+  },
+
+  {
     "id": "dashboard-temp",
     "type": "ui_gauge",
     "z": "tab-dragon",
@@ -128,8 +164,8 @@
     "colors": ["#00b4d8", "#3fb950", "#f85149"],
     "seg1": 18,
     "seg2": 28,
-    "x": 560,
-    "y": 240,
+    "x": 780,
+    "y": 260,
     "wires": []
   },
 
@@ -137,7 +173,7 @@
     "id": "dashboard-press",
     "type": "ui_gauge",
     "z": "tab-dragon",
-    "name": "Gauge Pressão",
+    "name": "Gauge Pressao",
     "group": "grupo-telemetria",
     "order": 2,
     "width": 6,
@@ -151,8 +187,8 @@
     "colors": ["#00b4d8", "#3fb950", "#f85149"],
     "seg1": 90,
     "seg2": 110,
-    "x": 560,
-    "y": 300,
+    "x": 780,
+    "y": 320,
     "wires": []
   },
 
@@ -160,7 +196,7 @@
     "id": "dashboard-o2",
     "type": "ui_gauge",
     "z": "tab-dragon",
-    "name": "Gauge Oxigênio",
+    "name": "Gauge Oxigenio",
     "group": "grupo-telemetria",
     "order": 3,
     "width": 6,
@@ -174,8 +210,8 @@
     "colors": ["#f85149", "#3fb950", "#f85149"],
     "seg1": 19,
     "seg2": 23,
-    "x": 560,
-    "y": 360,
+    "x": 780,
+    "y": 380,
     "wires": []
   },
 
@@ -189,7 +225,7 @@
     "datatype": "json",
     "broker": "hivemq-broker",
     "x": 140,
-    "y": 440,
+    "y": 460,
     "wires": [["debug-alerta-raw"]]
   },
 
@@ -204,10 +240,8 @@
     "tostatus": true,
     "complete": "payload",
     "targetType": "msg",
-    "statusVal": "",
-    "statusType": "auto",
     "x": 360,
-    "y": 440,
+    "y": 460,
     "wires": []
   },
 
@@ -224,15 +258,6 @@
     "protocolVersion": "4",
     "keepalive": "60",
     "cleansession": true,
-    "birthTopic": "",
-    "birthQos": "0",
-    "birthPayload": "",
-    "closeTopic": "",
-    "closeQos": "0",
-    "closePayload": "",
-    "willTopic": "",
-    "willQos": "0",
-    "willPayload": "",
     "credentials": {
       "user": "GlobalSolutionESPS",
       "password": "Global@Solution1"
