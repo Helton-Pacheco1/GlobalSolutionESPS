@@ -179,7 +179,7 @@ O painel com os gauges fica disponível em `http://localhost:1880/ui`
 | Recurso | Link |
 |---|---|
 | Wokwi Público | https://wokwi.com/projects/466233793732245505 |
-| Repositório GitHub | [inserir link aqui] |
+| Repositório GitHub | https://github.com/Helton-Pacheco1/GlobalSolutionESPS |
 
 ---
 
